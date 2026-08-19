@@ -3,6 +3,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from .models import Comment
+from .tasks import resize_uploaded_image
 
 
 class FileUploadView(APIView):
@@ -34,9 +35,11 @@ class FileUploadView(APIView):
         comment.file = file_obj
         comment.save()
 
+        if ext in ['.jpg', '.jpeg', '.png', '.gif']:
+            resize_uploaded_image.delay(comment.file.name)
 
         return Response({
             "success": True,
-            "message": "Файл успешно загружен",
+            "message": "File uploaded successfully",
             "file_url": comment.file.url
         }, status=status.HTTP_200_OK)
