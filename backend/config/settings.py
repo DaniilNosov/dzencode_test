@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'comments',
     'mptt',
+    'graphene_django',
 ]
 
 MIDDLEWARE = [
@@ -135,4 +136,8 @@ MAILERS = {
     'default': {
         'BACKEND': 'django.core.mail.backends.console.EmailBackend',
     },
+}
+
+GRAPHENE = {
+    'SCHEMA': 'config.schema.schema'
 }
