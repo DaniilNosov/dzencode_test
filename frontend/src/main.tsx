@@ -1,18 +1,23 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import { ApolloClient, InMemoryCache, HttpLink } from '@apollo/client'
+
+// "Глубокие импорты", чтобы не ругался TypeScript
+import { ApolloClient, InMemoryCache } from '@apollo/client/core'
 import { ApolloProvider } from '@apollo/client/react'
+
+// Теперь это стандартный чистый импорт!
+// @ts-ignore
+import { createUploadLink } from 'apollo-upload-client'
+
 import App from './App.tsx'
 import './index.css'
 
-const httpLink = new HttpLink({
-  uri: 'http://localhost:8000/graphql/',
-})
-
 const client = new ApolloClient({
-  link: httpLink,
+  link: createUploadLink({
+    uri: 'http://localhost:8000/graphql/',
+  }) as any,
   cache: new InMemoryCache(),
-})
+}) as any
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
