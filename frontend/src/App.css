@@ -331,3 +331,91 @@ body {
 .attachment-link:hover {
   background: #e2e8f0;
 }
+
+.toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-toolbar {
+  background: var(--bg-main);
+  border: 1px solid var(--border);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-family: monospace;
+  cursor: pointer;
+  color: var(--text-main);
+  transition: background 0.2s;
+}
+
+.btn-toolbar:hover {
+  background: #e2e8f0;
+}
+
+.btn-preview-toggle {
+  background: var(--primary);
+  color: white;
+  border: none;
+  font-weight: bold;
+  margin-left: auto;
+}
+
+.btn-preview-toggle:hover {
+  background: #334155;
+}
+
+.preview-box {
+  min-height: 80px;
+  padding: 12px;
+  border: 1px dashed var(--primary);
+  border-radius: 6px;
+  background: #f8fafc;
+  margin-bottom: 12px;
+  font-size: 0.95rem;
+}
+
+.attachment-image {
+  max-width: 320px;
+  max-height: 240px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  object-fit: cover;
+  cursor: zoom-in;
+  transition: opacity 0.2s;
+}
+
+.attachment-image:hover {
+  opacity: 0.8;
+}
+
+.lightbox-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+  cursor: zoom-out;
+  backdrop-filter: blur(4px);
+}
+
+.lightbox-image {
+  max-width: 90vw;
+  max-height: 90vh;
+  border: 4px solid white;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  animation: zoomIn 0.2s ease-out;
+}
+
+@keyframes zoomIn {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}

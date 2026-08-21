@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { gql, useQuery, useMutation } from '@apollo/client'
 import DOMPurify from 'dompurify'
 import './App.css'
@@ -10,7 +10,7 @@ interface Comment {
   email?: string
   text: string
   createdAt: string
-  file?: string | null // ДОБАВЛЕНО ПОЛЕ
+  file?: string | null
   children?: Comment[]
 }
 
@@ -28,6 +28,12 @@ interface MutationData {
     errors: string[]
     comment: Comment
   }
+}
+
+// Строгие настройки для DOMPurify (только разрешенные теги)
+const purifyConfig = {
+  ALLOWED_TAGS: ['a', 'code', 'i', 'strong'],
+  ALLOWED_ATTR: ['href', 'title']
 }
 
 // --- GRAPHQL ---
@@ -63,11 +69,19 @@ const GET_COMMENTS = gql`
   }
 `
 
-// ДОБАВЛЕНА ПЕРЕМЕННАЯ $file ТИПА Upload
+const GET_CAPTCHA = gql`
+  query GetCaptcha {
+    captcha {
+      key
+      image
+    }
+  }
+`
+
 const CREATE_COMMENT = gql`
   ${COMMENT_FIELDS}
-  mutation CreateComment($userName: String!, $email: String!, $text: String!, $parentId: ID, $file: Upload) {
-    createComment(userName: $userName, email: $email, text: $text, parentId: $parentId, file: $file) {
+  mutation CreateComment($userName: String!, $email: String!, $text: String!, $homePage: String, $parentId: ID, $file: Upload, $captchaKey: String!, $captchaValue: String!) {
+    createComment(userName: $userName, email: $email, text: $text, homePage: $homePage, parentId: $parentId, file: $file, captchaKey: $captchaKey, captchaValue: $captchaValue) {
       success
       errors
       comment {
@@ -81,10 +95,16 @@ const CREATE_COMMENT = gql`
 function CommentForm({ parentId = null, onCompleted }: { parentId?: string | null, onCompleted?: () => void }) {
   const [userName, setUserName] = useState('')
   const [email, setEmail] = useState('')
+  const [homePage, setHomePage] = useState('')
   const [text, setText] = useState('')
-  const [file, setFile] = useState<File | null>(null) // ДОБАВЛЕН СТЕЙТ ФАЙЛА
+  const [file, setFile] = useState<File | null>(null)
+  const [captchaValue, setCaptchaValue] = useState('')
 
+  const [isPreview, setIsPreview] = useState(false)
+  const textRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const { data: captchaData, refetch: refetchCaptcha } = useQuery(GET_CAPTCHA, { fetchPolicy: 'network-only' })
 
   const [createComment, { loading, error, data }] = useMutation<MutationData>(CREATE_COMMENT, {
     refetchQueries: ["GetRootComments"],
@@ -92,28 +112,88 @@ function CommentForm({ parentId = null, onCompleted }: { parentId?: string | nul
       if (mutationData?.createComment?.success) {
         setUserName('')
         setEmail('')
+        setHomePage('')
         setText('')
         setFile(null)
-        if (fileInputRef.current) fileInputRef.current.value = '' // Очищаем инпут
+        setCaptchaValue('')
+        setIsPreview(false)
+        if (fileInputRef.current) fileInputRef.current.value = ''
         if (onCompleted) onCompleted()
       }
+      refetchCaptcha()
     }
   })
 
+  const insertTag = (openTag: string, closeTag: string) => {
+    const textarea = textRef.current
+    if (!textarea) return
+
+    const start = textarea.selectionStart
+    const end = textarea.selectionEnd
+    const selectedText = text.substring(start, end)
+    const newText = text.substring(0, start) + openTag + selectedText + closeTag + text.substring(end)
+
+    setText(newText)
+
+    setTimeout(() => {
+      textarea.focus()
+      textarea.setSelectionRange(start + openTag.length, end + openTag.length)
+    }, 0)
+  }
+
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    // Передаем file вместе с остальными переменными
-    createComment({ variables: { userName, email, text, parentId, file } })
+    if (!captchaData?.captcha?.key) return
+
+    createComment({
+      variables: {
+        userName,
+        email,
+        homePage: homePage || null,
+        text,
+        parentId,
+        file,
+        captchaKey: captchaData.captcha.key,
+        captchaValue
+      }
+    })
   }
 
   return (
     <div className="comment-form-card">
       <form onSubmit={handleSubmit} className="comment-form">
-        <input className="form-input" required type="text" placeholder="Username" value={userName} onChange={e => setUserName(e.target.value)} />
+        <input className="form-input" required type="text" placeholder="Username (letters and digits)" pattern="[A-Za-z0-9]+" title="Only letters and digits allowed" value={userName} onChange={e => setUserName(e.target.value)} />
         <input className="form-input" required type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} />
-        <textarea className="form-textarea" required placeholder="Write a comment... (HTML tags <strong>, <code> allowed)" value={text} onChange={e => setText(e.target.value)} rows={3} />
+        <input className="form-input" type="url" placeholder="Home page (optional URL)" value={homePage} onChange={e => setHomePage(e.target.value)} />
 
-        {/* ИНПУТ ДЛЯ ФАЙЛА */}
+        <div className="toolbar">
+          <button type="button" className="btn-toolbar" onClick={() => insertTag('<i>', '</i>')}>[i]</button>
+          <button type="button" className="btn-toolbar" onClick={() => insertTag('<strong>', '</strong>')}>[strong]</button>
+          <button type="button" className="btn-toolbar" onClick={() => insertTag('<code>', '</code>')}>[code]</button>
+          <button type="button" className="btn-toolbar" onClick={() => insertTag('<a href="" title="">', '</a>')}>[a]</button>
+
+          <button type="button" className="btn-toolbar btn-preview-toggle" onClick={() => setIsPreview(!isPreview)}>
+            {isPreview ? 'Back to Edit' : 'Preview'}
+          </button>
+        </div>
+
+        {isPreview ? (
+          <div
+            className="preview-box"
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(text, purifyConfig) || '<span style="color: gray">Nothing to preview...</span>' }}
+          />
+        ) : (
+          <textarea
+            ref={textRef}
+            className="form-textarea"
+            required
+            placeholder="Write a comment... (HTML tags allowed)"
+            value={text}
+            onChange={e => setText(e.target.value)}
+            rows={4}
+          />
+        )}
+
         <div className="file-input-wrapper">
           <input
             type="file"
@@ -124,13 +204,36 @@ function CommentForm({ parentId = null, onCompleted }: { parentId?: string | nul
           />
         </div>
 
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginTop: '12px', marginBottom: '12px' }}>
+          {captchaData?.captcha && (
+            <>
+              <img
+                src={`data:image/png;base64,${captchaData.captcha.image}`}
+                alt="CAPTCHA"
+                style={{ borderRadius: '6px', border: '1px solid var(--border)', cursor: 'pointer', height: '40px' }}
+                onClick={() => refetchCaptcha()}
+                title="Click to refresh image"
+              />
+              <input
+                className="form-input"
+                required
+                type="text"
+                placeholder="Enter text from image"
+                value={captchaValue}
+                onChange={e => setCaptchaValue(e.target.value)}
+                style={{ margin: 0, flex: 1, padding: '10px' }}
+              />
+            </>
+          )}
+        </div>
+
         <button type="submit" disabled={loading} className="btn-submit">
           {loading ? 'Submitting...' : 'Post Comment'}
         </button>
 
         {data?.createComment?.success === false && (
           <div className="error-message">
-            <strong>Error saving comment:</strong>
+            <strong>Error:</strong>
             {data.createComment.errors.map((err, i) => <p key={i}>{err}</p>)}
           </div>
         )}
@@ -142,8 +245,8 @@ function CommentForm({ parentId = null, onCompleted }: { parentId?: string | nul
 
 function CommentNode({ comment }: { comment: Comment }) {
   const [isReplying, setIsReplying] = useState(false)
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false)
 
-  // Базовый URL для файлов (Django отдает относительный путь, мы добавляем хост)
   const fileUrl = comment.file ? `http://localhost:8000/media/${comment.file}` : null
   const isImage = comment.file?.match(/\.(jpeg|jpg|gif|png)$/i) != null
 
@@ -157,16 +260,26 @@ function CommentNode({ comment }: { comment: Comment }) {
 
         <div
           className="comment-body"
-          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(comment.text) }}
+          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(comment.text, purifyConfig) }}
         />
 
-        {/* РЕНДЕР ПРИКРЕПЛЕННОГО ФАЙЛА */}
         {fileUrl && (
           <div className="comment-attachment">
             {isImage ? (
-              <a href={fileUrl} target="_blank" rel="noreferrer">
-                <img src={fileUrl} alt="attachment" className="attachment-image" />
-              </a>
+              <>
+                <img
+                  src={fileUrl}
+                  alt="attachment"
+                  className="attachment-image"
+                  onClick={() => setIsLightboxOpen(true)}
+                />
+
+                {isLightboxOpen && (
+                  <div className="lightbox-overlay" onClick={() => setIsLightboxOpen(false)}>
+                    <img src={fileUrl} alt="fullscreen" className="lightbox-image" />
+                  </div>
+                )}
+              </>
             ) : (
               <a href={fileUrl} target="_blank" rel="noreferrer" className="attachment-link">
                 📎 Download .txt attachment
@@ -203,9 +316,39 @@ function App() {
   const [orderBy, setOrderBy] = useState('-created_at')
   const [page, setPage] = useState(1)
 
-  const { loading, error, data } = useQuery<QueryData>(GET_COMMENTS, {
+  // Достаем функцию refetch из useQuery для ручного обновления при сигнале от WebSocket
+  const { loading, error, data, refetch } = useQuery<QueryData>(GET_COMMENTS, {
     variables: { orderBy, page }
   })
+
+  // ПОДКЛЮЧАЕМ WEBSOCKET
+  useEffect(() => {
+    console.log("Пытаемся подключиться к WebSocket...")
+    const ws = new WebSocket('ws://localhost:8000/ws/comments/')
+
+    ws.onopen = () => {
+      console.log('✅ WebSocket успешно подключен!')
+    }
+
+    ws.onmessage = (event) => {
+      console.log('📩 Получено сообщение от сервера:', event.data)
+      const parsedData = JSON.parse(event.data)
+      if (parsedData.message === 'new_comment') {
+        // Получили сигнал о новом комментарии — обновляем список
+        refetch()
+      }
+    }
+
+    ws.onerror = (error) => {
+      console.error('❌ Ошибка WebSocket:', error)
+    }
+
+    // Чистим соединение при закрытии компонента
+    return () => {
+      console.log("Закрываем соединение WebSocket...")
+      ws.close()
+    }
+  }, [refetch])
 
   const handleSortChange = (newOrderBy: string) => {
     setOrderBy(newOrderBy)

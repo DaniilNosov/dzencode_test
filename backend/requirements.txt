@@ -47,3 +47,5 @@ wcwidth==0.8.2
 webencodings==0.6.1
 django-cors-headers==4.9.0
 graphene-file-upload==1.3.0
+daphne>=4.0.0
+#channels-graphql-ws>=1.0.0rc8
