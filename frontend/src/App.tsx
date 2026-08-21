@@ -3,7 +3,6 @@ import { gql, useQuery, useMutation } from '@apollo/client'
 import DOMPurify from 'dompurify'
 import './App.css'
 
-// --- TYPES ---
 interface Comment {
   id: string
   userName: string
@@ -30,13 +29,11 @@ interface MutationData {
   }
 }
 
-// Строгие настройки для DOMPurify (только разрешенные теги)
 const purifyConfig = {
   ALLOWED_TAGS: ['a', 'code', 'i', 'strong'],
   ALLOWED_ATTR: ['href', 'title']
 }
 
-// --- GRAPHQL ---
 const COMMENT_FIELDS = gql`
   fragment CommentFields on CommentType {
     id
@@ -91,7 +88,6 @@ const CREATE_COMMENT = gql`
   }
 `
 
-// --- COMPONENTS ---
 function CommentForm({ parentId = null, onCompleted }: { parentId?: string | null, onCompleted?: () => void }) {
   const [userName, setUserName] = useState('')
   const [email, setEmail] = useState('')
@@ -316,36 +312,32 @@ function App() {
   const [orderBy, setOrderBy] = useState('-created_at')
   const [page, setPage] = useState(1)
 
-  // Достаем функцию refetch из useQuery для ручного обновления при сигнале от WebSocket
   const { loading, error, data, refetch } = useQuery<QueryData>(GET_COMMENTS, {
     variables: { orderBy, page }
   })
 
-  // ПОДКЛЮЧАЕМ WEBSOCKET
   useEffect(() => {
-    console.log("Пытаемся подключиться к WebSocket...")
+    console.log("WebSocket connecting")
     const ws = new WebSocket('ws://localhost:8000/ws/comments/')
 
     ws.onopen = () => {
-      console.log('✅ WebSocket успешно подключен!')
+      console.log('WebSocket connected')
     }
 
     ws.onmessage = (event) => {
-      console.log('📩 Получено сообщение от сервера:', event.data)
+      console.log('Got a message from the server:', event.data)
       const parsedData = JSON.parse(event.data)
       if (parsedData.message === 'new_comment') {
-        // Получили сигнал о новом комментарии — обновляем список
         refetch()
       }
     }
 
     ws.onerror = (error) => {
-      console.error('❌ Ошибка WebSocket:', error)
+      console.error('WebSocket Error:', error)
     }
 
-    // Чистим соединение при закрытии компонента
     return () => {
-      console.log("Закрываем соединение WebSocket...")
+      console.log("Closing connection with WebSocket")
       ws.close()
     }
   }, [refetch])

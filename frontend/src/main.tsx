@@ -1,11 +1,9 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 
-// "Глубокие импорты", чтобы не ругался TypeScript
 import { ApolloClient, InMemoryCache } from '@apollo/client/core'
 import { ApolloProvider } from '@apollo/client/react'
 
-// Теперь это стандартный чистый импорт!
 // @ts-ignore
 import { createUploadLink } from 'apollo-upload-client'
 

@@ -165,10 +165,9 @@ class CreateComment(graphene.Mutation):
                         "message": "new_comment"
                     }
                 )
-                print("✅ Сигнал WebSocket успешно отправлен из GraphQL!")
+                print("WebSocket successfully sent from GraphQL")
             except Exception as ws_err:
-                print(f"❌ Ошибка отправки WebSocket: {ws_err}")
-            # --------------------------------------
+                print(f"WebSocket Error: {ws_err}")
 
             return CreateComment(comment=comment, success=True, errors=None)
 
